@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Background -->
+  <rect width="256" height="256" rx="48" ry="48" fill="#1565C0"/>
+
+  <!-- Capsule body (rotated 45°, centred) -->
+  <!-- Left half (white) -->
+  <clipPath id="left-half">
+    <rect x="0" y="0" width="128" height="256"/>
+  </clipPath>
+  <!-- Right half (light blue) -->
+  <clipPath id="right-half">
+    <rect x="128" y="0" width="128" height="256"/>
+  </clipPath>
+
+  <!-- Full capsule shape, then clip to halves -->
+  <g transform="translate(128,118) rotate(-35)">
+    <!-- right/bottom half -->
+    <rect x="0" y="-38" width="76" height="76" rx="38" ry="38" fill="#42A5F5"/>
+    <!-- left/top half -->
+    <rect x="-76" y="-38" width="76" height="76" rx="38" ry="38" fill="#ffffff"/>
+    <!-- centre join strip -->
+    <rect x="-4" y="-38" width="8" height="76" fill="#90CAF9"/>
+    <!-- outer border for definition -->
+    <rect x="-76" y="-38" width="152" height="76" rx="38" ry="38"
+          fill="none" stroke="#0D47A1" stroke-width="4"/>
+  </g>
+
+  <!-- Pill lines on white half (gives tablet impression) -->
+  <g transform="translate(128,118) rotate(-35)">
+    <line x1="-38" y1="-20" x2="-38" y2="20" stroke="#BBDEFB" stroke-width="3" stroke-linecap="round"/>
+    <line x1="-55" y1="-10" x2="-55" y2="10" stroke="#BBDEFB" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Bell badge (bottom-right) -->
+  <circle cx="192" cy="192" r="40" fill="#F57F17"/>
+  <!-- Bell body -->
+  <path d="M181,183 Q181,170 192,170 Q203,170 203,183 L206,196 H178 Z" fill="#ffffff"/>
+  <!-- Bell base -->
+  <rect x="178" y="194" width="28" height="5" rx="2" fill="#ffffff"/>
+  <!-- Clapper -->
+  <circle cx="192" cy="202" r="4" fill="#ffffff"/>
+  <!-- Bell top hook -->
+  <rect x="190" y="165" width="4" height="7" rx="2" fill="#ffffff"/>
+</svg>
