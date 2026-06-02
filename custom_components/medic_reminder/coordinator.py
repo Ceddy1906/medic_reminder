@@ -233,10 +233,21 @@ class MedicReminderCoordinator(DataUpdateCoordinator):
             bring_list = med.get(CONF_MED_BRING_LIST)
             if bring_list:
                 try:
+                    schedule = (
+                        f"{med.get(CONF_MED_MORNING, 0)}-"
+                        f"{med.get(CONF_MED_NOON, 0)}-"
+                        f"{med.get(CONF_MED_EVENING, 0)}-"
+                        f"{med.get(CONF_MED_NIGHT, 0)}"
+                    )
+                    description = (
+                        f"{med.get(CONF_MED_DOSAGE, '')} "
+                        f"({int(med.get(CONF_MED_PACKAGE_SIZE, 0))}Stk), "
+                        f"{schedule}"
+                    ).strip()
                     await self.hass.services.async_call(
                         "todo",
                         "add_item",
-                        {"item": name},
+                        {"item": name, "description": description},
                         target={"entity_id": bring_list},
                         blocking=True,
                     )
