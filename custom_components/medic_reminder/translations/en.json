@@ -1,0 +1,83 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Medic Reminder",
+        "description": "Configure the daily time when actions are evaluated.",
+        "data": {
+          "action_time": "Daily check time"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Integration is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "menu": {
+        "title": "Medic Reminder – Settings",
+        "menu_options": {
+          "add_medication": "Add medication",
+          "edit_medication": "Edit medication",
+          "delete_medication": "Delete medication",
+          "global_settings": "Global settings",
+          "done": "Done"
+        }
+      },
+      "global_settings": {
+        "title": "Global settings",
+        "data": {
+          "action_time": "Daily check time"
+        }
+      },
+      "edit_medication": {
+        "title": "Edit medication – select",
+        "data": {
+          "medication": "Medication"
+        }
+      },
+      "delete_medication": {
+        "title": "Delete medication",
+        "data": {
+          "medication": "Medication"
+        }
+      },
+      "med_basic": {
+        "title": "Medication – Basic info",
+        "data": {
+          "name": "Name",
+          "dosage": "Dosage (e.g. 10mg, 500mg, 1 tablet)",
+          "morning": "Morning",
+          "noon": "Noon",
+          "evening": "Evening",
+          "night": "Night",
+          "package_size": "Package size (pieces)"
+        }
+      },
+      "med_action": {
+        "title": "Medication – Action",
+        "description": "Choose which action to trigger when supply runs low. Only fill in the field matching your chosen action.",
+        "data": {
+          "action_type": "Action",
+          "action_days_before": "Days before empty",
+          "bring_list_entity": "Bring! list (todo entity)",
+          "calendar_entity": "Calendar",
+          "notify_service": "Notify service"
+        },
+        "data_description": {
+          "action_days_before": "How many days before the projected empty date should the action be triggered?"
+        }
+      },
+      "med_prenotify": {
+        "title": "Medication – Pre-notification",
+        "description": "Optional separate early warning notification before the main action.",
+        "data": {
+          "pre_notify_enabled": "Enable pre-notification",
+          "pre_notify_days": "Days before empty (pre-notify)",
+          "pre_notify_service": "Notify service for pre-notification"
+        }
+      }
+    }
+  }
+}

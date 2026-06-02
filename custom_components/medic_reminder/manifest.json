@@ -1,0 +1,13 @@
+{
+  "domain": "medic_reminder",
+  "name": "Medic Reminder",
+  "version": "1.0.0",
+  "config_flow": true,
+  "documentation": "https://github.com/MarcMann/medic_reminder",
+  "issue_tracker": "https://github.com/MarcMann/medic_reminder/issues",
+  "codeowners": ["@MarcMann"],
+  "requirements": [],
+  "dependencies": [],
+  "iot_class": "local_push",
+  "integration_type": "service"
+}
