@@ -309,6 +309,16 @@ class MedicReminderCoordinator(DataUpdateCoordinator):
             }
         return result
 
+    async def async_set_current_count(self, med_id: str, count: float) -> None:
+        """Manually set the current stock for a medication (e.g. when starting with a partial pack)."""
+        state = self._med_states.setdefault(med_id, {})
+        state[STATE_CURRENT_COUNT] = count
+        # Reset trigger flags so actions fire again at the right threshold
+        state[STATE_ACTION_TRIGGERED] = False
+        state[STATE_PRE_NOTIFY_TRIGGERED] = False
+        await self._save_state()
+        await self.async_refresh()
+
     def on_options_updated(self) -> None:
         for unsub in self._unsub_time + self._unsub_todo:
             unsub()

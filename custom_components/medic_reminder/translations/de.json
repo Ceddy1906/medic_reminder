@@ -17,10 +17,12 @@
     "step": {
       "menu": {
         "title": "Medic Reminder – Einstellungen",
+        "description": "Aktuelle Medikamente:\n{medications}",
         "menu_options": {
           "add_medication": "Medikament hinzufügen",
           "edit_medication": "Medikament bearbeiten",
           "delete_medication": "Medikament löschen",
+          "adjust_stock": "Bestand anpassen",
           "global_settings": "Globale Einstellungen",
           "done": "Fertig"
         }
@@ -67,6 +69,19 @@
         },
         "data_description": {
           "action_days_before": "Wie viele Tage vor dem errechneten Leerungsdatum soll die Aktion ausgelöst werden?"
+        }
+      },
+      "adjust_stock": {
+        "title": "Bestand anpassen – Medikament wählen",
+        "data": {
+          "medication": "Medikament"
+        }
+      },
+      "adjust_stock_set": {
+        "title": "Bestand anpassen – {med_name} {dosage}",
+        "description": "Packungsgröße: {package_size} Stück. Gib den aktuellen Vorrat ein.",
+        "data": {
+          "current_count": "Aktueller Bestand (Stück)"
         }
       },
       "med_prenotify": {

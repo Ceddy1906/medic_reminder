@@ -7,22 +7,19 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.components.todo import TodoListEntity
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
-from homeassistant.helpers import entity_registry as er, selector
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
-    EntitySelector,
-    EntitySelectorConfig,
+    BooleanSelector,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
     TextSelector,
     TimeSelector,
-    BooleanSelector,
-    NumberSelector,
-    NumberSelectorConfig,
-    NumberSelectorMode,
 )
 
 from .const import (
@@ -51,45 +48,57 @@ from .const import (
     DEFAULT_ACTION_TIME,
     DEFAULT_PRE_NOTIFY_DAYS,
     DOMAIN,
+    STATE_CURRENT_COUNT,
 )
 
-_MENU_ADD = "add_medication"
-_MENU_EDIT = "edit_medication"
-_MENU_DELETE = "delete_medication"
+_MENU_ADD      = "add_medication"
+_MENU_EDIT     = "edit_medication"
+_MENU_DELETE   = "delete_medication"
+_MENU_STOCK    = "adjust_stock"
 _MENU_SETTINGS = "global_settings"
-_MENU_DONE = "done"
+_MENU_DONE     = "done"
 
 
 def _number(min_val: float = 0, max_val: float = 100, step: float = 0.5, mode: str = "box") -> NumberSelector:
     return NumberSelector(NumberSelectorConfig(min=min_val, max=max_val, step=step, mode=NumberSelectorMode(mode)))
 
 
-def _notify_services(hass) -> list[str]:
-    """Return list of available notify service names (without 'notify.' prefix)."""
-    services = hass.services.async_services().get("notify", {})
-    return sorted(services.keys())
+def _notify_selector(hass, default=vol.UNDEFINED) -> tuple[SelectSelector | TextSelector, Any]:
+    """Return a selector for notify services (dropdown + custom value, or plain text)."""
+    services = sorted(hass.services.async_services().get("notify", {}).keys())
+    if services:
+        sel = SelectSelector(SelectSelectorConfig(
+            options=services,
+            mode=SelectSelectorMode.DROPDOWN,
+            custom_value=True,
+        ))
+    else:
+        sel = TextSelector()
+    return sel, default
 
 
 def _todo_entities(hass) -> list[str]:
     registry = er.async_get(hass)
-    return [
-        e.entity_id
-        for e in registry.entities.values()
-        if e.domain == "todo"
-    ]
+    return [e.entity_id for e in registry.entities.values() if e.domain == "todo"]
 
 
 def _calendar_entities(hass) -> list[str]:
     registry = er.async_get(hass)
-    return [
-        e.entity_id
-        for e in registry.entities.values()
-        if e.domain == "calendar"
-    ]
+    return [e.entity_id for e in registry.entities.values() if e.domain == "calendar"]
+
+
+def _med_label(med: dict) -> str:
+    schedule = (
+        f"{med.get(CONF_MED_MORNING, 0)}-"
+        f"{med.get(CONF_MED_NOON, 0)}-"
+        f"{med.get(CONF_MED_EVENING, 0)}-"
+        f"{med.get(CONF_MED_NIGHT, 0)}"
+    )
+    return f"{med[CONF_MED_NAME]} {med.get(CONF_MED_DOSAGE, '')}  [{schedule}]  Packung: {med.get(CONF_MED_PACKAGE_SIZE, '?')} Stk"
 
 
 class MedicReminderConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Initial setup flow — just global settings, medications added via options."""
+    """Initial setup flow."""
 
     VERSION = 1
 
@@ -103,7 +112,6 @@ class MedicReminderConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_MEDICATIONS: [],
                 },
             )
-
         schema = vol.Schema({
             vol.Required(CONF_ACTION_TIME, default=DEFAULT_ACTION_TIME): TimeSelector(),
         })
@@ -119,26 +127,54 @@ class MedicReminderOptionsFlow(OptionsFlow):
     """Options flow for managing medications."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
+        self._entry = config_entry
         self._medications: list[dict] = deepcopy(config_entry.options.get(CONF_MEDICATIONS, []))
         self._action_time: str = config_entry.options.get(CONF_ACTION_TIME, DEFAULT_ACTION_TIME)
         self._editing_med: dict | None = None
         self._new_med: dict = {}
+        self._stock_med_id: str | None = None
 
-    # ── Main menu ────────────────────────────────────────────────────────────
+    def _coordinator(self):
+        return self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
+
+    # ── Main menu ─────────────────────────────────────────────────────────────
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         return await self.async_step_menu()
 
     async def async_step_menu(self, user_input: dict[str, Any] | None = None):
-        med_names = [f"{m[CONF_MED_NAME]} ({m.get(CONF_MED_DOSAGE, '')})" for m in self._medications]
         options = [_MENU_ADD, _MENU_SETTINGS]
-        if med_names:
-            options += [_MENU_EDIT, _MENU_DELETE]
+        if self._medications:
+            options += [_MENU_EDIT, _MENU_DELETE, _MENU_STOCK]
         options.append(_MENU_DONE)
+
+        # Build overview of current medications for the description
+        coordinator = self._coordinator()
+        lines: list[str] = []
+        for med in self._medications:
+            mid = med[CONF_MED_ID]
+            count = "?"
+            if coordinator and coordinator.data:
+                data = coordinator.data.get(mid, {})
+                count = f"{data.get(STATE_CURRENT_COUNT, med.get(CONF_MED_PACKAGE_SIZE, '?')):.1f}"
+            schedule = (
+                f"{med.get(CONF_MED_MORNING,0)}-"
+                f"{med.get(CONF_MED_NOON,0)}-"
+                f"{med.get(CONF_MED_EVENING,0)}-"
+                f"{med.get(CONF_MED_NIGHT,0)}"
+            )
+            lines.append(
+                f"• **{med[CONF_MED_NAME]}** {med.get(CONF_MED_DOSAGE,'')} "
+                f"| Schema: {schedule} | Packung: {med.get(CONF_MED_PACKAGE_SIZE,'?')} Stk "
+                f"| Bestand: {count} Stk"
+            )
+
+        description = "\n".join(lines) if lines else "Noch keine Medikamente eingerichtet."
 
         return self.async_show_menu(
             step_id="menu",
             menu_options=options,
+            description_placeholders={"medications": description},
         )
 
     # ── Global settings ───────────────────────────────────────────────────────
@@ -147,7 +183,6 @@ class MedicReminderOptionsFlow(OptionsFlow):
         if user_input is not None:
             self._action_time = user_input[CONF_ACTION_TIME]
             return await self.async_step_menu()
-
         schema = vol.Schema({
             vol.Required(CONF_ACTION_TIME, default=self._action_time): TimeSelector(),
         })
@@ -156,12 +191,10 @@ class MedicReminderOptionsFlow(OptionsFlow):
     # ── Done ─────────────────────────────────────────────────────────────────
 
     async def async_step_done(self, user_input: dict[str, Any] | None = None):
-        return self.async_create_entry(
-            data={
-                CONF_ACTION_TIME: self._action_time,
-                CONF_MEDICATIONS: self._medications,
-            }
-        )
+        return self.async_create_entry(data={
+            CONF_ACTION_TIME: self._action_time,
+            CONF_MEDICATIONS: self._medications,
+        })
 
     # ── Add medication ────────────────────────────────────────────────────────
 
@@ -179,10 +212,10 @@ class MedicReminderOptionsFlow(OptionsFlow):
             self._new_med = deepcopy(self._editing_med) if self._editing_med else {}
             return await self.async_step_med_basic()
 
-        options = {m[CONF_MED_ID]: f"{m[CONF_MED_NAME]} ({m.get(CONF_MED_DOSAGE, '')})" for m in self._medications}
+        options = [{"value": m[CONF_MED_ID], "label": _med_label(m)} for m in self._medications]
         schema = vol.Schema({
             vol.Required("medication"): SelectSelector(
-                SelectSelectorConfig(options=[{"value": k, "label": v} for k, v in options.items()], mode=SelectSelectorMode.LIST)
+                SelectSelectorConfig(options=options, mode=SelectSelectorMode.LIST)
             ),
         })
         return self.async_show_form(step_id="edit_medication", data_schema=schema)
@@ -195,13 +228,74 @@ class MedicReminderOptionsFlow(OptionsFlow):
             self._medications = [m for m in self._medications if m[CONF_MED_ID] != med_id]
             return await self.async_step_menu()
 
-        options = {m[CONF_MED_ID]: f"{m[CONF_MED_NAME]} ({m.get(CONF_MED_DOSAGE, '')})" for m in self._medications}
+        options = [{"value": m[CONF_MED_ID], "label": _med_label(m)} for m in self._medications]
         schema = vol.Schema({
             vol.Required("medication"): SelectSelector(
-                SelectSelectorConfig(options=[{"value": k, "label": v} for k, v in options.items()], mode=SelectSelectorMode.LIST)
+                SelectSelectorConfig(options=options, mode=SelectSelectorMode.LIST)
             ),
         })
         return self.async_show_form(step_id="delete_medication", data_schema=schema)
+
+    # ── Adjust stock ──────────────────────────────────────────────────────────
+
+    async def async_step_adjust_stock(self, user_input: dict[str, Any] | None = None):
+        """Step 1: select which medication to adjust."""
+        if user_input is not None:
+            self._stock_med_id = user_input["medication"]
+            return await self.async_step_adjust_stock_set()
+
+        coordinator = self._coordinator()
+        options: list[dict] = []
+        for med in self._medications:
+            mid = med[CONF_MED_ID]
+            count = "?"
+            if coordinator and coordinator.data:
+                data = coordinator.data.get(mid, {})
+                count = f"{data.get(STATE_CURRENT_COUNT, med.get(CONF_MED_PACKAGE_SIZE, '?')):.1f}"
+            label = f"{med[CONF_MED_NAME]} {med.get(CONF_MED_DOSAGE,'')} (Bestand: {count} / {med.get(CONF_MED_PACKAGE_SIZE,'?')} Stk)"
+            options.append({"value": mid, "label": label})
+
+        schema = vol.Schema({
+            vol.Required("medication"): SelectSelector(
+                SelectSelectorConfig(options=options, mode=SelectSelectorMode.LIST)
+            ),
+        })
+        return self.async_show_form(step_id="adjust_stock", data_schema=schema)
+
+    async def async_step_adjust_stock_set(self, user_input: dict[str, Any] | None = None):
+        """Step 2: enter new current count."""
+        med = next((m for m in self._medications if m[CONF_MED_ID] == self._stock_med_id), None)
+        if med is None:
+            return await self.async_step_menu()
+
+        coordinator = self._coordinator()
+        current = med.get(CONF_MED_PACKAGE_SIZE, 30)
+        if coordinator and coordinator.data:
+            data = coordinator.data.get(self._stock_med_id, {})
+            current = data.get(STATE_CURRENT_COUNT, current)
+
+        if user_input is not None:
+            new_count = float(user_input["current_count"])
+            if coordinator:
+                await coordinator.async_set_current_count(self._stock_med_id, new_count)
+            self._stock_med_id = None
+            return await self.async_step_menu()
+
+        package_size = float(med.get(CONF_MED_PACKAGE_SIZE, 100))
+        schema = vol.Schema({
+            vol.Required("current_count", default=round(float(current), 1)): _number(
+                0, package_size, 0.5
+            ),
+        })
+        return self.async_show_form(
+            step_id="adjust_stock_set",
+            data_schema=schema,
+            description_placeholders={
+                "med_name": med[CONF_MED_NAME],
+                "dosage": med.get(CONF_MED_DOSAGE, ""),
+                "package_size": str(int(package_size)),
+            },
+        )
 
     # ── Step 1: Basic info ────────────────────────────────────────────────────
 
@@ -212,13 +306,13 @@ class MedicReminderOptionsFlow(OptionsFlow):
 
         defaults = self._new_med
         schema = vol.Schema({
-            vol.Required(CONF_MED_NAME, default=defaults.get(CONF_MED_NAME, "")): TextSelector(),
-            vol.Required(CONF_MED_DOSAGE, default=defaults.get(CONF_MED_DOSAGE, "")): TextSelector(),
-            vol.Required(CONF_MED_MORNING, default=defaults.get(CONF_MED_MORNING, 0)): _number(0, 10, 0.5),
-            vol.Required(CONF_MED_NOON, default=defaults.get(CONF_MED_NOON, 0)): _number(0, 10, 0.5),
-            vol.Required(CONF_MED_EVENING, default=defaults.get(CONF_MED_EVENING, 0)): _number(0, 10, 0.5),
-            vol.Required(CONF_MED_NIGHT, default=defaults.get(CONF_MED_NIGHT, 0)): _number(0, 10, 0.5),
-            vol.Required(CONF_MED_PACKAGE_SIZE, default=defaults.get(CONF_MED_PACKAGE_SIZE, 30)): _number(1, 1000, 1),
+            vol.Required(CONF_MED_NAME,         default=defaults.get(CONF_MED_NAME, "")): TextSelector(),
+            vol.Required(CONF_MED_DOSAGE,        default=defaults.get(CONF_MED_DOSAGE, "")): TextSelector(),
+            vol.Required(CONF_MED_MORNING,       default=defaults.get(CONF_MED_MORNING, 0)): _number(0, 10, 0.5),
+            vol.Required(CONF_MED_NOON,          default=defaults.get(CONF_MED_NOON, 0)): _number(0, 10, 0.5),
+            vol.Required(CONF_MED_EVENING,       default=defaults.get(CONF_MED_EVENING, 0)): _number(0, 10, 0.5),
+            vol.Required(CONF_MED_NIGHT,         default=defaults.get(CONF_MED_NIGHT, 0)): _number(0, 10, 0.5),
+            vol.Required(CONF_MED_PACKAGE_SIZE,  default=defaults.get(CONF_MED_PACKAGE_SIZE, 30)): _number(1, 1000, 1),
         })
         return self.async_show_form(step_id="med_basic", data_schema=schema)
 
@@ -228,9 +322,9 @@ class MedicReminderOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             action_type = user_input[CONF_MED_ACTION_TYPE]
-            bring_list = user_input.get(CONF_MED_BRING_LIST)
-            calendar = user_input.get(CONF_MED_CALENDAR)
-            notify = user_input.get(CONF_MED_NOTIFY)
+            bring_list  = user_input.get(CONF_MED_BRING_LIST)
+            calendar    = user_input.get(CONF_MED_CALENDAR)
+            notify      = user_input.get(CONF_MED_NOTIFY)
 
             if action_type == ACTION_BRING and not bring_list:
                 errors[CONF_MED_BRING_LIST] = "required_for_bring"
@@ -243,38 +337,35 @@ class MedicReminderOptionsFlow(OptionsFlow):
                 return await self.async_step_med_prenotify()
 
         defaults = self._new_med
-        todo_entities = _todo_entities(self.hass)
+        todo_entities     = _todo_entities(self.hass)
         calendar_entities = _calendar_entities(self.hass)
-        notify_services = _notify_services(self.hass)
+        notify_sel, _     = _notify_selector(self.hass)
 
         schema_dict: dict = {
-            vol.Required(CONF_MED_ACTION_TYPE, default=defaults.get(CONF_MED_ACTION_TYPE, ACTION_NOTIFY)): SelectSelector(
-                SelectSelectorConfig(
+            vol.Required(CONF_MED_ACTION_TYPE, default=defaults.get(CONF_MED_ACTION_TYPE, ACTION_NOTIFY)):
+                SelectSelector(SelectSelectorConfig(
                     options=[
-                        {"value": ACTION_BRING, "label": "Bring! (Einkaufsliste)"},
+                        {"value": ACTION_BRING,    "label": "Bring! (Einkaufsliste)"},
                         {"value": ACTION_CALENDAR, "label": "Kalender-Eintrag"},
-                        {"value": ACTION_NOTIFY, "label": "Benachrichtigung (Notify)"},
+                        {"value": ACTION_NOTIFY,   "label": "Benachrichtigung (Notify)"},
                     ],
                     mode=SelectSelectorMode.LIST,
-                )
-            ),
-            vol.Required(CONF_MED_ACTION_DAYS, default=defaults.get(CONF_MED_ACTION_DAYS, DEFAULT_ACTION_DAYS)): _number(1, 60, 1),
+                )),
+            vol.Required(CONF_MED_ACTION_DAYS, default=defaults.get(CONF_MED_ACTION_DAYS, DEFAULT_ACTION_DAYS)):
+                _number(1, 60, 1),
         }
 
         if todo_entities:
-            schema_dict[vol.Optional(CONF_MED_BRING_LIST, default=defaults.get(CONF_MED_BRING_LIST, vol.UNDEFINED))] = SelectSelector(
-                SelectSelectorConfig(options=todo_entities, mode=SelectSelectorMode.DROPDOWN)
-            )
+            schema_dict[vol.Optional(CONF_MED_BRING_LIST, default=defaults.get(CONF_MED_BRING_LIST, vol.UNDEFINED))] = \
+                SelectSelector(SelectSelectorConfig(options=todo_entities, mode=SelectSelectorMode.DROPDOWN))
 
         if calendar_entities:
-            schema_dict[vol.Optional(CONF_MED_CALENDAR, default=defaults.get(CONF_MED_CALENDAR, vol.UNDEFINED))] = SelectSelector(
-                SelectSelectorConfig(options=calendar_entities, mode=SelectSelectorMode.DROPDOWN)
-            )
+            schema_dict[vol.Optional(CONF_MED_CALENDAR, default=defaults.get(CONF_MED_CALENDAR, vol.UNDEFINED))] = \
+                SelectSelector(SelectSelectorConfig(options=calendar_entities, mode=SelectSelectorMode.DROPDOWN))
 
-        if notify_services:
-            schema_dict[vol.Optional(CONF_MED_NOTIFY, default=defaults.get(CONF_MED_NOTIFY, vol.UNDEFINED))] = SelectSelector(
-                SelectSelectorConfig(options=notify_services, mode=SelectSelectorMode.DROPDOWN)
-            )
+        # Notify: always shown, supports custom value (free text)
+        notify_sel, _ = _notify_selector(self.hass)
+        schema_dict[vol.Optional(CONF_MED_NOTIFY, default=defaults.get(CONF_MED_NOTIFY, vol.UNDEFINED))] = notify_sel
 
         return self.async_show_form(
             step_id="med_action",
@@ -291,18 +382,16 @@ class MedicReminderOptionsFlow(OptionsFlow):
             return await self.async_step_menu()
 
         defaults = self._new_med
-        notify_services = _notify_services(self.hass)
+        notify_sel, _ = _notify_selector(self.hass)
 
         schema_dict: dict = {
-            vol.Required(CONF_MED_PRE_NOTIFY_ENABLED, default=defaults.get(CONF_MED_PRE_NOTIFY_ENABLED, False)): BooleanSelector(),
-            vol.Required(CONF_MED_PRE_NOTIFY_DAYS, default=defaults.get(CONF_MED_PRE_NOTIFY_DAYS, DEFAULT_PRE_NOTIFY_DAYS)): _number(1, 90, 1),
+            vol.Required(CONF_MED_PRE_NOTIFY_ENABLED, default=defaults.get(CONF_MED_PRE_NOTIFY_ENABLED, False)):
+                BooleanSelector(),
+            vol.Required(CONF_MED_PRE_NOTIFY_DAYS, default=defaults.get(CONF_MED_PRE_NOTIFY_DAYS, DEFAULT_PRE_NOTIFY_DAYS)):
+                _number(1, 90, 1),
+            vol.Optional(CONF_MED_PRE_NOTIFY_SERVICE, default=defaults.get(CONF_MED_PRE_NOTIFY_SERVICE, vol.UNDEFINED)):
+                notify_sel,
         }
-
-        if notify_services:
-            schema_dict[vol.Optional(CONF_MED_PRE_NOTIFY_SERVICE, default=defaults.get(CONF_MED_PRE_NOTIFY_SERVICE, vol.UNDEFINED))] = SelectSelector(
-                SelectSelectorConfig(options=notify_services, mode=SelectSelectorMode.DROPDOWN)
-            )
-
         return self.async_show_form(step_id="med_prenotify", data_schema=vol.Schema(schema_dict))
 
     # ── Helpers ───────────────────────────────────────────────────────────────
@@ -310,7 +399,6 @@ class MedicReminderOptionsFlow(OptionsFlow):
     def _save_medication(self) -> None:
         if CONF_MED_ID not in self._new_med:
             self._new_med[CONF_MED_ID] = str(uuid.uuid4())
-
         med_id = self._new_med[CONF_MED_ID]
         existing = next((i for i, m in enumerate(self._medications) if m[CONF_MED_ID] == med_id), None)
         if existing is not None:

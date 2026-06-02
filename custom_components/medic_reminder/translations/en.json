@@ -17,10 +17,12 @@
     "step": {
       "menu": {
         "title": "Medic Reminder – Settings",
+        "description": "Current medications:\n{medications}",
         "menu_options": {
           "add_medication": "Add medication",
           "edit_medication": "Edit medication",
           "delete_medication": "Delete medication",
+          "adjust_stock": "Adjust stock",
           "global_settings": "Global settings",
           "done": "Done"
         }
@@ -67,6 +69,19 @@
         },
         "data_description": {
           "action_days_before": "How many days before the projected empty date should the action be triggered?"
+        }
+      },
+      "adjust_stock": {
+        "title": "Adjust stock – select medication",
+        "data": {
+          "medication": "Medication"
+        }
+      },
+      "adjust_stock_set": {
+        "title": "Adjust stock – {med_name} {dosage}",
+        "description": "Package size: {package_size} pieces. Enter the current stock.",
+        "data": {
+          "current_count": "Current stock (pieces)"
         }
       },
       "med_prenotify": {

@@ -11,7 +11,19 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_MED_ID, CONF_MED_NAME, DOMAIN
+from .const import (
+    CONF_MED_ACTION_DAYS,
+    CONF_MED_ACTION_TYPE,
+    CONF_MED_DOSAGE,
+    CONF_MED_EVENING,
+    CONF_MED_ID,
+    CONF_MED_MORNING,
+    CONF_MED_NAME,
+    CONF_MED_NIGHT,
+    CONF_MED_NOON,
+    CONF_MED_PACKAGE_SIZE,
+    DOMAIN,
+)
 from .coordinator import MedicReminderCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,8 +47,9 @@ async def async_setup_entry(
 class _MedSensorBase(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator: MedicReminderCoordinator, med: dict) -> None:
         super().__init__(coordinator)
-        self._med_id = med[CONF_MED_ID]
+        self._med_id  = med[CONF_MED_ID]
         self._med_name = med[CONF_MED_NAME]
+        self._med_cfg  = med   # static config reference
         self._attr_has_entity_name = True
         self._attr_device_info = {
             "identifiers": {(DOMAIN, coordinator.config_entry.entry_id)},
@@ -68,9 +81,21 @@ class DaysUntilEmptySensor(_MedSensorBase):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        d = self._med_data()
+        d   = self._med_data()
+        cfg = self._med_cfg
+        schedule = (
+            f"{cfg.get(CONF_MED_MORNING, 0)}-"
+            f"{cfg.get(CONF_MED_NOON, 0)}-"
+            f"{cfg.get(CONF_MED_EVENING, 0)}-"
+            f"{cfg.get(CONF_MED_NIGHT, 0)}"
+        )
         return {
-            "current_count": d.get("current_count"),
+            "current_count":  d.get("current_count"),
+            "package_size":   cfg.get(CONF_MED_PACKAGE_SIZE),
+            "dosage":         cfg.get(CONF_MED_DOSAGE),
+            "schedule":       schedule,
+            "action_type":    cfg.get(CONF_MED_ACTION_TYPE),
+            "action_days_before": cfg.get(CONF_MED_ACTION_DAYS),
         }
 
 
