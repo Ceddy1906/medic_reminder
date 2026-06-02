@@ -63,18 +63,35 @@ def _number(min_val: float = 0, max_val: float = 100, step: float = 0.5, mode: s
     return NumberSelector(NumberSelectorConfig(min=min_val, max=max_val, step=step, mode=NumberSelectorMode(mode)))
 
 
-def _notify_selector(hass, default=vol.UNDEFINED) -> tuple[SelectSelector | TextSelector, Any]:
-    """Return a selector for notify services (dropdown + custom value, or plain text)."""
-    services = sorted(hass.services.async_services().get("notify", {}).keys())
-    if services:
-        sel = SelectSelector(SelectSelectorConfig(
-            options=services,
+def _notify_selector(hass, medications: list[dict] | None = None) -> SelectSelector | TextSelector:
+    """Return a selector for notify services.
+
+    Combines HA-registered notify services with any manually entered service
+    names already saved across all medications in this integration instance.
+    Always allows custom_value so new names can be typed in freely.
+    """
+    # Services registered in HA
+    registered = set(hass.services.async_services().get("notify", {}).keys())
+
+    # Services already saved in any medication (notify_service or pre_notify_service)
+    saved: set[str] = set()
+    for med in (medications or []):
+        for key in (CONF_MED_NOTIFY, CONF_MED_PRE_NOTIFY_SERVICE):
+            val = med.get(key)
+            if val:
+                saved.add(val)
+
+    # Merge, keeping saved-only entries visually separated via sort
+    all_services = sorted(registered | saved)
+
+    if all_services:
+        return SelectSelector(SelectSelectorConfig(
+            options=all_services,
             mode=SelectSelectorMode.DROPDOWN,
             custom_value=True,
         ))
-    else:
-        sel = TextSelector()
-    return sel, default
+    # No services at all → plain text input
+    return TextSelector()
 
 
 def _todo_entities(hass) -> list[str]:
@@ -339,7 +356,6 @@ class MedicReminderOptionsFlow(OptionsFlow):
         defaults = self._new_med
         todo_entities     = _todo_entities(self.hass)
         calendar_entities = _calendar_entities(self.hass)
-        notify_sel, _     = _notify_selector(self.hass)
 
         schema_dict: dict = {
             vol.Required(CONF_MED_ACTION_TYPE, default=defaults.get(CONF_MED_ACTION_TYPE, ACTION_NOTIFY)):
@@ -364,7 +380,7 @@ class MedicReminderOptionsFlow(OptionsFlow):
                 SelectSelector(SelectSelectorConfig(options=calendar_entities, mode=SelectSelectorMode.DROPDOWN))
 
         # Notify: always shown, supports custom value (free text)
-        notify_sel, _ = _notify_selector(self.hass)
+        notify_sel = _notify_selector(self.hass, self._medications)
         schema_dict[vol.Optional(CONF_MED_NOTIFY, default=defaults.get(CONF_MED_NOTIFY, vol.UNDEFINED))] = notify_sel
 
         return self.async_show_form(
@@ -382,7 +398,7 @@ class MedicReminderOptionsFlow(OptionsFlow):
             return await self.async_step_menu()
 
         defaults = self._new_med
-        notify_sel, _ = _notify_selector(self.hass)
+        notify_sel = _notify_selector(self.hass, self._medications)
 
         schema_dict: dict = {
             vol.Required(CONF_MED_PRE_NOTIFY_ENABLED, default=defaults.get(CONF_MED_PRE_NOTIFY_ENABLED, False)):
