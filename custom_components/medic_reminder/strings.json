@@ -1,0 +1,83 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Medic Reminder einrichten",
+        "description": "Legt die globale Uhrzeit fest, zu der täglich Aktionen ausgelöst werden.",
+        "data": {
+          "action_time": "Tägliche Prüfuhrzeit"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Integration ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "menu": {
+        "title": "Medic Reminder – Einstellungen",
+        "menu_options": {
+          "add_medication": "Medikament hinzufügen",
+          "edit_medication": "Medikament bearbeiten",
+          "delete_medication": "Medikament löschen",
+          "global_settings": "Globale Einstellungen",
+          "done": "Fertig"
+        }
+      },
+      "global_settings": {
+        "title": "Globale Einstellungen",
+        "data": {
+          "action_time": "Tägliche Prüfuhrzeit"
+        }
+      },
+      "edit_medication": {
+        "title": "Medikament bearbeiten – Auswahl",
+        "data": {
+          "medication": "Medikament"
+        }
+      },
+      "delete_medication": {
+        "title": "Medikament löschen",
+        "data": {
+          "medication": "Medikament"
+        }
+      },
+      "med_basic": {
+        "title": "Medikament – Grunddaten",
+        "data": {
+          "name": "Name",
+          "dosage": "Dosierung (z.B. 10mg, 500mg, 1 Stk)",
+          "morning": "Morgens",
+          "noon": "Mittags",
+          "evening": "Abends",
+          "night": "Nachts",
+          "package_size": "Packungsgröße (Stück)"
+        }
+      },
+      "med_action": {
+        "title": "Medikament – Aktion",
+        "description": "Wähle, welche Aktion ausgelöst werden soll, wenn der Vorrat zur Neige geht. Fülle nur das Feld aus, das zur gewählten Aktion passt.",
+        "data": {
+          "action_type": "Aktion",
+          "action_days_before": "Tage vor Leerung",
+          "bring_list_entity": "Bring!-Liste (Todo-Entität)",
+          "calendar_entity": "Kalender",
+          "notify_service": "Notify-Dienst"
+        },
+        "data_description": {
+          "action_days_before": "Wie viele Tage vor dem errechneten Leerungsdatum soll die Aktion ausgelöst werden?"
+        }
+      },
+      "med_prenotify": {
+        "title": "Medikament – Vorab-Benachrichtigung",
+        "description": "Optionale, separate Vorab-Benachrichtigung vor der Hauptaktion.",
+        "data": {
+          "pre_notify_enabled": "Vorab-Benachrichtigung aktivieren",
+          "pre_notify_days": "Tage vor Leerung (Vorab-Notify)",
+          "pre_notify_service": "Notify-Dienst für Vorab-Info"
+        }
+      }
+    }
+  }
+}
