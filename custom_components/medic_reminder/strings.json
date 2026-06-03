@@ -54,6 +54,7 @@
           "noon": "Mittags",
           "evening": "Abends",
           "night": "Nachts",
+          "frequency": "Einnahmefrequenz",
           "package_size": "Packungsgröße (Stück)"
         }
       },

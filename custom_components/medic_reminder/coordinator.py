@@ -33,8 +33,11 @@ from .const import (
     CONF_MED_PRE_NOTIFY_DAYS,
     CONF_MED_PRE_NOTIFY_ENABLED,
     CONF_MED_PRE_NOTIFY_SERVICE,
+    CONF_MED_FREQUENCY,
     CONF_MEDICATIONS,
     DOMAIN,
+    FREQ_DAILY,
+    FREQ_DIVISOR,
     STATE_ACTION_TRIGGERED,
     STATE_CURRENT_COUNT,
     STATE_PRE_NOTIFY_TRIGGERED,
@@ -65,12 +68,15 @@ class MedicReminderCoordinator(DataUpdateCoordinator):
         return self.config_entry.options.get(CONF_MEDICATIONS, [])
 
     def daily_dose(self, med: dict) -> float:
-        return (
+        """Return the effective daily dose, accounting for intake frequency."""
+        per_intake = (
             float(med.get(CONF_MED_MORNING, 0))
             + float(med.get(CONF_MED_NOON, 0))
             + float(med.get(CONF_MED_EVENING, 0))
             + float(med.get(CONF_MED_NIGHT, 0))
         )
+        divisor = FREQ_DIVISOR.get(med.get(CONF_MED_FREQUENCY, FREQ_DAILY), 1.0)
+        return per_intake / divisor
 
     def days_until_empty(self, med: dict) -> float | None:
         dose = self.daily_dose(med)

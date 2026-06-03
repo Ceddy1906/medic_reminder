@@ -33,6 +33,7 @@ from .const import (
     CONF_MED_CALENDAR,
     CONF_MED_DOSAGE,
     CONF_MED_EVENING,
+    CONF_MED_FREQUENCY,
     CONF_MED_ID,
     CONF_MED_MORNING,
     CONF_MED_NAME,
@@ -48,6 +49,12 @@ from .const import (
     DEFAULT_ACTION_TIME,
     DEFAULT_PRE_NOTIFY_DAYS,
     DOMAIN,
+    FREQ_1X_WEEK,
+    FREQ_2X_WEEK,
+    FREQ_3X_WEEK,
+    FREQ_DAILY,
+    FREQ_EVERY_2D,
+    FREQ_EVERY_3D,
     STATE_CURRENT_COUNT,
 )
 
@@ -104,6 +111,16 @@ def _calendar_entities(hass) -> list[str]:
     return [e.entity_id for e in registry.entities.values() if e.domain == "calendar"]
 
 
+_FREQ_LABELS: dict[str, str] = {
+    FREQ_DAILY:    "täglich",
+    FREQ_EVERY_2D: "alle 2 Tage",
+    FREQ_EVERY_3D: "alle 3 Tage",
+    FREQ_2X_WEEK:  "2×/Woche",
+    FREQ_3X_WEEK:  "3×/Woche",
+    FREQ_1X_WEEK:  "1×/Woche",
+}
+
+
 def _med_label(med: dict) -> str:
     schedule = (
         f"{med.get(CONF_MED_MORNING, 0)}-"
@@ -111,7 +128,11 @@ def _med_label(med: dict) -> str:
         f"{med.get(CONF_MED_EVENING, 0)}-"
         f"{med.get(CONF_MED_NIGHT, 0)}"
     )
-    return f"{med[CONF_MED_NAME]} {med.get(CONF_MED_DOSAGE, '')}  [{schedule}]  Packung: {med.get(CONF_MED_PACKAGE_SIZE, '?')} Stk"
+    freq = _FREQ_LABELS.get(med.get(CONF_MED_FREQUENCY, FREQ_DAILY), "")
+    return (
+        f"{med[CONF_MED_NAME]} {med.get(CONF_MED_DOSAGE, '')}  "
+        f"[{schedule}  {freq}]  Packung: {med.get(CONF_MED_PACKAGE_SIZE, '?')} Stk"
+    )
 
 
 class MedicReminderConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -180,9 +201,10 @@ class MedicReminderOptionsFlow(OptionsFlow):
                 f"{med.get(CONF_MED_EVENING,0)}-"
                 f"{med.get(CONF_MED_NIGHT,0)}"
             )
+            freq = _FREQ_LABELS.get(med.get(CONF_MED_FREQUENCY, FREQ_DAILY), "")
             lines.append(
                 f"• **{med[CONF_MED_NAME]}** {med.get(CONF_MED_DOSAGE,'')} "
-                f"| Schema: {schedule} | Packung: {med.get(CONF_MED_PACKAGE_SIZE,'?')} Stk "
+                f"| Schema: {schedule} {freq} | Packung: {med.get(CONF_MED_PACKAGE_SIZE,'?')} Stk "
                 f"| Bestand: {count} Stk"
             )
 
@@ -329,6 +351,18 @@ class MedicReminderOptionsFlow(OptionsFlow):
             vol.Required(CONF_MED_NOON,          default=defaults.get(CONF_MED_NOON, 0)): _number(0, 10, 0.5),
             vol.Required(CONF_MED_EVENING,       default=defaults.get(CONF_MED_EVENING, 0)): _number(0, 10, 0.5),
             vol.Required(CONF_MED_NIGHT,         default=defaults.get(CONF_MED_NIGHT, 0)): _number(0, 10, 0.5),
+            vol.Required(CONF_MED_FREQUENCY,     default=defaults.get(CONF_MED_FREQUENCY, FREQ_DAILY)):
+                SelectSelector(SelectSelectorConfig(
+                    options=[
+                        {"value": FREQ_DAILY,    "label": "Täglich"},
+                        {"value": FREQ_EVERY_2D, "label": "Alle 2 Tage"},
+                        {"value": FREQ_EVERY_3D, "label": "Alle 3 Tage"},
+                        {"value": FREQ_2X_WEEK,  "label": "2× pro Woche"},
+                        {"value": FREQ_3X_WEEK,  "label": "3× pro Woche"},
+                        {"value": FREQ_1X_WEEK,  "label": "1× pro Woche"},
+                    ],
+                    mode=SelectSelectorMode.LIST,
+                )),
             vol.Required(CONF_MED_PACKAGE_SIZE,  default=defaults.get(CONF_MED_PACKAGE_SIZE, 30)): _number(1, 1000, 1),
         })
         return self.async_show_form(step_id="med_basic", data_schema=schema)

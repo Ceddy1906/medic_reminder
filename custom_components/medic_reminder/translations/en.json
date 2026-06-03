@@ -54,6 +54,7 @@
           "noon": "Noon",
           "evening": "Evening",
           "night": "Night",
+          "frequency": "Intake frequency",
           "package_size": "Package size (pieces)"
         }
       },

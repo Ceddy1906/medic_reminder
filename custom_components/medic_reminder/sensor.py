@@ -16,6 +16,7 @@ from .const import (
     CONF_MED_ACTION_TYPE,
     CONF_MED_DOSAGE,
     CONF_MED_EVENING,
+    CONF_MED_FREQUENCY,
     CONF_MED_ID,
     CONF_MED_MORNING,
     CONF_MED_NAME,
@@ -23,6 +24,7 @@ from .const import (
     CONF_MED_NOON,
     CONF_MED_PACKAGE_SIZE,
     DOMAIN,
+    FREQ_DAILY,
 )
 from .coordinator import MedicReminderCoordinator
 
@@ -94,8 +96,9 @@ class DaysUntilEmptySensor(_MedSensorBase):
             "package_size":   cfg.get(CONF_MED_PACKAGE_SIZE),
             "dosage":         cfg.get(CONF_MED_DOSAGE),
             "schedule":       schedule,
-            "action_type":    cfg.get(CONF_MED_ACTION_TYPE),
+            "action_type":        cfg.get(CONF_MED_ACTION_TYPE),
             "action_days_before": cfg.get(CONF_MED_ACTION_DAYS),
+            "frequency":          cfg.get(CONF_MED_FREQUENCY, FREQ_DAILY),
         }
 
 
