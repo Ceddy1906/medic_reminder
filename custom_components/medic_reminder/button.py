@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_MED_ID, CONF_MED_NAME, CONF_MED_PACKAGE_SIZE, DOMAIN
+from .const import CONF_MED_ID, CONF_MED_NAME, CONF_MED_PACKAGE_SIZE, DOMAIN, STATE_CURRENT_COUNT
 from .coordinator import MedicReminderCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,10 +47,16 @@ class RefillButton(ButtonEntity):
         }
 
     async def async_press(self) -> None:
-        """Reset stock to full package size and clear trigger flags."""
+        """Add one full package to the current stock."""
+        current = self._coordinator.data.get(self._med_id, {}).get(
+            STATE_CURRENT_COUNT, 0.0
+        )
+        new_count = float(current) + self._package_size
         _LOGGER.info(
-            "Refill button pressed for %s — resetting stock to %.0f",
+            "Refill button pressed for %s — adding %.0f to %.1f → %.1f",
             self._med_name,
             self._package_size,
+            current,
+            new_count,
         )
-        await self._coordinator.async_set_current_count(self._med_id, self._package_size)
+        await self._coordinator.async_set_current_count(self._med_id, new_count)

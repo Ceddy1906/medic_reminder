@@ -299,7 +299,7 @@ class MedicReminderCoordinator(DataUpdateCoordinator):
         await self._send_notify(
             notify_service,
             f"Medikament-Vorwarnung: {name}",
-            f"{name} ({med.get(CONF_MED_DOSAGE, '')}) — Vorrat reicht noch ca. {days_left:.0f} Tage. Bitte bald kaufen.",
+            f"{name} ({med.get(CONF_MED_DOSAGE, '')}) — Vorrat reicht noch ca. {days_left:.0f} Tage. Bitte neu besorgen.",
         )
 
     async def _send_notify(self, service: str, title: str, message: str) -> None:
